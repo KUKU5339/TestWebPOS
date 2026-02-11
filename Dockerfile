@@ -11,11 +11,28 @@ COPY public ./public
 RUN npm run build
 
 # Stage 2: Install PHP dependencies with Composer
-FROM composer:2 AS composer_build
+FROM php:8.2-cli AS composer_build
+
+# Install system packages needed for PHP extensions and Composer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git unzip zip libpq-dev libpng-dev libjpeg-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 WORKDIR /app
 COPY composer.json composer.lock ./
+
+# Install required PHP extensions for build resolution
+RUN docker-php-ext-configure gd --with-jpeg --with-png \
+ && docker-php-ext-install gd pdo pdo_pgsql zip
+
+# Install PHP dependencies (now under PHP 8.2 with required extensions)
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress
+
 COPY . .
+
 # Ensure autoload is optimized
 RUN composer dump-autoload --optimize
 
@@ -28,10 +45,11 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
     sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf && \
     a2enmod rewrite
 
-# System packages and PHP extensions (PostgreSQL)
+# System packages and PHP extensions (PostgreSQL + GD)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev git unzip \
- && docker-php-ext-install pdo pdo_pgsql \
+    libpq-dev git unzip libpng-dev libjpeg-dev \
+ && docker-php-ext-configure gd --with-jpeg --with-png \
+ && docker-php-ext-install gd pdo pdo_pgsql zip \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
