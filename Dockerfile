@@ -1,7 +1,7 @@
 # Multi-stage build for Laravel (PHP 8.2 + Apache) with Vite assets
 #
 # Stage 1: Build frontend assets with Node (Vite)
-FROM node:18-alpine AS node_build
+FROM node:20-alpine AS node_build
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -15,7 +15,7 @@ FROM php:8.2-cli AS composer_build
 
 # Install system packages needed for PHP extensions and Composer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git unzip zip libpq-dev libpng-dev libjpeg-dev \
+    git unzip zip libpq-dev libpng-dev libjpeg-dev libfreetype6-dev libzip-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
@@ -25,7 +25,7 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 
 # Install required PHP extensions for build resolution
-RUN docker-php-ext-configure gd --with-jpeg --with-png \
+RUN docker-php-ext-configure gd --with-jpeg --with-freetype \
  && docker-php-ext-install gd pdo pdo_pgsql zip
 
 # Install PHP dependencies (now under PHP 8.2 with required extensions)
@@ -47,8 +47,8 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 
 # System packages and PHP extensions (PostgreSQL + GD)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev git unzip libpng-dev libjpeg-dev \
- && docker-php-ext-configure gd --with-jpeg --with-png \
+    libpq-dev git unzip libpng-dev libjpeg-dev libfreetype6-dev libzip-dev \
+ && docker-php-ext-configure gd --with-jpeg --with-freetype \
  && docker-php-ext-install gd pdo pdo_pgsql zip \
  && rm -rf /var/lib/apt/lists/*
 
